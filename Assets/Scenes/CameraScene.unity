@@ -34860,6 +34860,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1674171fa29a02f4aabe598004d08d11, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  floatToSleep: 0
 --- !u!54 &580446316
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -35050,6 +35051,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1674171fa29a02f4aabe598004d08d11, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  floatToSleep: 0
 --- !u!54 &779035697
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -35177,6 +35179,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1674171fa29a02f4aabe598004d08d11, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  floatToSleep: 0
 --- !u!54 &793492923
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -35304,6 +35307,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1674171fa29a02f4aabe598004d08d11, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  floatToSleep: 0
 --- !u!54 &939544603
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -35431,6 +35435,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1674171fa29a02f4aabe598004d08d11, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  floatToSleep: 0
 --- !u!54 &1249238840
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -35830,14 +35835,6 @@ PrefabInstance:
       value: Sphere
       objectReference: {fileID: 0}
     - target: {fileID: 6532416352905598212, guid: f48750c52f008a140aa040aa20678b9f, type: 3}
-      propertyPath: maxSpeed
-      value: 10
-      objectReference: {fileID: 0}
-    - target: {fileID: 6532416352905598212, guid: f48750c52f008a140aa040aa20678b9f, type: 3}
-      propertyPath: maxAcceleration
-      value: 11
-      objectReference: {fileID: 0}
-    - target: {fileID: 6532416352905598212, guid: f48750c52f008a140aa040aa20678b9f, type: 3}
       propertyPath: playerInputSpace
       value: 
       objectReference: {fileID: 1981811684}
@@ -35884,10 +35881,6 @@ PrefabInstance:
     - target: {fileID: 6532416352905598215, guid: f48750c52f008a140aa040aa20678b9f, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6532416352905598458, guid: f48750c52f008a140aa040aa20678b9f, type: 3}
-      propertyPath: m_Interpolate
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: f48750c52f008a140aa040aa20678b9f, type: 3}
