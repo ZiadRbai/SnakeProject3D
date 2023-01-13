@@ -33,7 +33,7 @@ public class MovingSphere : MonoBehaviour
 	Vector3 contactNormal, steepNormal;
 
 	Vector3 upAxis, rightAxis, forwardAxis;
-	Rigidbody body;
+	Rigidbody body, connectedBody, previousConnectedBody;
 	bool desiredJump;
 	int jumpPhase;
 
@@ -41,12 +41,13 @@ public class MovingSphere : MonoBehaviour
 	bool OnGround => groundContactCount > 0;
 	bool OnSteep => steepContactCount > 0;
 
-	Vector3 velocity, desiredVelocity;
+	Vector3 velocity, desiredVelocity, connectionVelocity;
+	Vector3 connectionWorldPosition, connectionLocalPosition;
 
 	int stepsSinceLastGrounded, stepsSinceLastJump;
 
-    void OnValidate()
-    {
+    
+	void OnValidate () {
 		minGroundDotProduct = Mathf.Cos(maxGroundAngle * Mathf.Deg2Rad);
 		minStairsDotProduct = Mathf.Cos(maxStairsAngle * Mathf.Deg2Rad);
 	}
@@ -63,26 +64,25 @@ public class MovingSphere : MonoBehaviour
 		Vector2 playerInput;
 		playerInput.x = Input.GetAxis("Horizontal");
 		playerInput.y = Input.GetAxis("Vertical");
-
 		playerInput = Vector2.ClampMagnitude(playerInput, 1f);
 
 		if (playerInputSpace)
 		{
 			rightAxis = ProjectDirectionOnPlane(playerInputSpace.right, upAxis);
-			forwardAxis = ProjectDirectionOnPlane(playerInputSpace.forward, upAxis);
+			forwardAxis =
+				ProjectDirectionOnPlane(playerInputSpace.forward, upAxis);
 		}
 		else
 		{
 			rightAxis = ProjectDirectionOnPlane(Vector3.right, upAxis);
 			forwardAxis = ProjectDirectionOnPlane(Vector3.forward, upAxis);
 		}
-		desiredVelocity = new Vector3(playerInput.x, 0f, playerInput.y) * maxSpeed;
-		
+		desiredVelocity =
+			new Vector3(playerInput.x, 0f, playerInput.y) * maxSpeed;
 
 		desiredJump |= Input.GetButtonDown("Jump");
-
 	}
-    private void FixedUpdate()
+	private void FixedUpdate()
     {
 		Vector3 gravity = CustomGravity.GetGravity(body.position, out upAxis);
 		UpdateState();
@@ -101,7 +101,9 @@ public class MovingSphere : MonoBehaviour
 	void ClearState()
     {
 		groundContactCount = steepContactCount = 0;
-		contactNormal = steepNormal =  Vector3.zero;
+		contactNormal = steepNormal =  connectionVelocity = Vector3.zero;
+		previousConnectedBody = connectedBody;
+		connectedBody = null;
     }
 
 	void UpdateState()
@@ -109,10 +111,6 @@ public class MovingSphere : MonoBehaviour
 		stepsSinceLastGrounded += 1;
 		stepsSinceLastJump += 1;
 		velocity = body.velocity;
-		if (stepsSinceLastJump > 1)
-        {
-			jumpPhase = 0;
-        }
 
         if (OnGround || SnapToGround() || CheckSteepContacts())
         {
@@ -130,6 +128,95 @@ public class MovingSphere : MonoBehaviour
 		{
 			contactNormal = upAxis;
 		}
+
+        if (connectedBody)
+        {
+			if(connectedBody.isKinematic || connectedBody.mass >= body.mass)
+            {
+				UpdateConnectionState();
+			}
+		}
+	}
+
+    void UpdateConnectionState()
+    {
+		if(connectedBody == previousConnectedBody)
+        {
+			Vector3 connectionMovement =
+				connectedBody.transform.TransformPoint(connectionLocalPosition) -
+				connectionWorldPosition ;
+
+			connectionVelocity = connectionMovement / Time.deltaTime;
+		}
+		connectionWorldPosition = body.position;
+		connectionLocalPosition = connectedBody.transform.InverseTransformPoint(
+			connectionWorldPosition
+		);
+	}
+
+	bool SnapToGround()
+	{
+		if (stepsSinceLastGrounded > 1 || stepsSinceLastJump <= 2)
+		{
+			return false;
+		}
+		float speed = velocity.magnitude;
+		if (speed > maxSnapSpeed)
+		{
+			return false;
+		}
+		if (!Physics.Raycast(body.position, -upAxis, out RaycastHit hit, probeDistance, probeMask))
+		{
+			return false;
+		}
+		float upDot = Vector3.Dot(upAxis, hit.normal);
+		if (upDot < GetMinDot(hit.collider.gameObject.layer))
+		{
+			return false;
+		}
+		groundContactCount = 1;
+		contactNormal = hit.normal;
+		float dot = Vector3.Dot(velocity, hit.normal);
+		if (dot > 0f)
+		{
+			velocity = (velocity - hit.normal * dot).normalized * speed;
+		}
+		connectedBody = hit.rigidbody;
+		return true;
+	}
+
+	bool CheckSteepContacts()
+	{
+		if (steepContactCount > 1)
+		{
+			steepNormal.Normalize();
+			float upDot = Vector3.Dot(upAxis, steepNormal);
+			if (upDot >= minGroundDotProduct)
+			{
+				steepContactCount = 0;
+				groundContactCount = 1;
+				contactNormal = steepNormal;
+				return true;
+			}
+		}
+		return false;
+	}
+	void AdjustVelocity()
+	{
+		Vector3 xAxis = ProjectDirectionOnPlane(rightAxis, contactNormal);
+		Vector3 zAxis = ProjectDirectionOnPlane(forwardAxis, contactNormal);
+
+		Vector3 relativeVelocity = velocity - connectionVelocity;
+		float currentX = Vector3.Dot(relativeVelocity, xAxis);
+		float currentZ = Vector3.Dot(relativeVelocity, zAxis);
+
+		float acceleration = OnGround ? maxAcceleration : maxAirAcceleration;
+		float maxSpeedChange = acceleration * Time.deltaTime;
+
+		float newX = Mathf.MoveTowards(currentX, desiredVelocity.x, maxSpeedChange);
+		float newZ = Mathf.MoveTowards(currentZ, desiredVelocity.z, maxSpeedChange);
+
+		velocity += xAxis * (newX - currentX) + zAxis * (newZ - currentZ);
 	}
 
 	void Jump(Vector3 gravity)
@@ -192,12 +279,19 @@ public class MovingSphere : MonoBehaviour
 			{
 				groundContactCount += 1;
 				contactNormal += normal;
-            }
+				
+					connectedBody = collision.rigidbody;
+				
+			}
             else if(upDot > -0.01f)
             {
 				steepContactCount += 1;
 				steepNormal += normal;
-            }
+				if (groundContactCount == 0)
+				{
+					connectedBody = collision.rigidbody;
+				}
+			}
 		}
     }
 
@@ -206,72 +300,10 @@ public class MovingSphere : MonoBehaviour
 		return (direction - normal * Vector3.Dot(direction, normal)).normalized;
 	}
 
-	void AdjustVelocity()
-    {
-		Vector3 xAxis = ProjectDirectionOnPlane(rightAxis, contactNormal);
-		Vector3 zAxis = ProjectDirectionOnPlane(forwardAxis, contactNormal);
-
-		float currentX = Vector3.Dot(velocity, xAxis);
-		float currentZ = Vector3.Dot(velocity, zAxis);
-
-		float acceleration = OnGround ? maxAcceleration : maxAirAcceleration;
-		float maxSpeedChange = acceleration * Time.deltaTime;
-
-		float newX = Mathf.MoveTowards(currentX, desiredVelocity.x, maxSpeedChange);
-		float newZ = Mathf.MoveTowards(currentZ, desiredVelocity.z, maxSpeedChange);
-
-		velocity += xAxis * (newX - currentX) + zAxis * (newZ - currentZ);
-    }
-
-	bool SnapToGround()
-    {
-		if(stepsSinceLastGrounded > 1 || stepsSinceLastJump <= 2)
-        {
-			return false;
-        }
-		float speed = velocity.magnitude;
-		if (speed > maxSnapSpeed)
-		{
-			return false;
-		}
-		if (!Physics.Raycast(body.position, -upAxis, out RaycastHit hit, probeDistance, probeMask))
-        {
-			return false;
-        }
-		float upDot = Vector3.Dot(upAxis, hit.normal);
-		if(upDot < GetMinDot(hit.collider.gameObject.layer))
-        {
-			return false;
-        }
-		groundContactCount = 1;
-		contactNormal = hit.normal;
-		float dot = Vector3.Dot(velocity, hit.normal);
-		if(dot > 0f)
-        {
-			velocity = (velocity - hit.normal * dot).normalized * speed;
-		}
-		return true;
-    }
-
 	float GetMinDot(int layer)
     {
 		return (stairsMask & (1 << layer)) == 0 ? 
 			minGroundDotProduct : minStairsDotProduct;
     }
 
-	bool CheckSteepContacts()
-	{
-		if (steepContactCount > 1)
-		{
-			steepNormal.Normalize();
-			float upDot = Vector3.Dot(upAxis, steepNormal);
-			if (upDot >= minGroundDotProduct)
-			{
-				groundContactCount = 1;
-				contactNormal = steepNormal;
-				return true;
-			}
-		}
-		return false;
-	}
 }
